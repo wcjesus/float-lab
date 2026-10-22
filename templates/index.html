@@ -2,75 +2,186 @@
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8">
-    <title>Conjunto F — ponto flutuante</title>
+    <title>Conjunto F — ponto flutuante (interativo)</title>
     <style>
         body { font-family: system-ui, sans-serif; max-width: 1100px;
                margin: 2rem auto; padding: 0 1rem; color: #222; }
-        h1   { font-size: 1.4rem; }
-        form { background: #f6f6f6; padding: 1rem 1.25rem;
-               border-radius: 8px; margin-bottom: 1.5rem; }
-        label { display: inline-block; min-width: 11rem; }
-        input[type=text] { width: 6rem; padding: .25rem .4rem;
-                           font-family: monospace; }
-        input[type=submit] { margin-top: .75rem; padding: .4rem 1rem;
-                             cursor: pointer; }
+        h1   { font-size: 1.35rem; }
+        h2   { font-size: 1.1rem; margin-top: 2rem; }
+
+        .controles { background: #f6f6f6; padding: 1rem 1.25rem;
+                     border-radius: 8px; margin-bottom: 1.5rem; }
+        .linha     { display: grid; grid-template-columns: 15rem 1fr 4rem;
+                     align-items: center; gap: .75rem; margin: .6rem 0; }
+        .linha label { font-weight: 500; }
+        .linha input[type=range] { width: 100%; }
+        .linha output { font-family: monospace; font-weight: 700;
+                        text-align: right; color: #2459a6; }
+
         .erro { background: #fde2e1; border: 1px solid #e0a0a0;
                 padding: .75rem 1rem; border-radius: 6px;
                 margin-bottom: 1rem; }
         .meta { background: #eef3fb; border-radius: 6px;
                 padding: .75rem 1rem; margin-bottom: 1rem; }
         .meta span { font-family: monospace; }
+        .aviso { color: #8a5a00; }
         img   { max-width: 100%; border: 1px solid #ddd;
                 border-radius: 6px; margin-bottom: 1rem; display: block; }
         pre   { background: #fafafa; border: 1px solid #ddd;
                 border-radius: 6px; padding: 1rem; overflow-x: auto;
                 font-size: .8rem; line-height: 1.35; }
-        .aviso { color: #8a5a00; }
+        .carregando { color: #888; font-style: italic; }
     </style>
 </head>
 <body>
     <h1>Conjunto F de números em aritmética de ponto flutuante</h1>
 
-    <form action="{{ url_for('calculate') }}" method="post">
-        <div><label for="base">Base (2 a 36):</label>
-             <input type="text" id="base" name="base"
-                    value="{{ resultado.base if resultado else '' }}"></div>
-        <div><label for="precisao">Precisão p (&gt;= 1):</label>
-             <input type="text" id="precisao" name="precisao"
-                    value="{{ resultado.precisao if resultado else '' }}"></div>
-        <div><label for="expoente_minimo">Expoente mínimo (-30 a 0):</label>
-             <input type="text" id="expoente_minimo" name="expoente_minimo"
-                    value="{{ resultado.emin if resultado else '' }}"></div>
-        <input type="submit" value="Gerar tabelas e gráficos">
-    </form>
-
-    {% if erro %}
-        <div class="erro"><strong>Erro:</strong> {{ erro }}</div>
-    {% endif %}
-
-    {% if resultado %}
-        <div class="meta">
-            <div><strong>F({{ resultado.base }}, {{ resultado.precisao }},
-                 {{ resultado.emin }}, {{ resultado.emax }})</strong></div>
-            <div>Normais positivos: <span>{{ resultado.qtd_normais }}</span></div>
-            <div>Subnormais positivos: <span>{{ resultado.qtd_subnormais }}</span></div>
-            {% if not resultado.completos and resultado.qtd_subnormais > 0 %}
-                <div class="aviso">
-                    Subnormais excedem o limite; exibindo apenas os normais.
-                </div>
-            {% endif %}
+    <div class="controles">
+        <div class="linha">
+            <label for="base">Base <em>b</em></label>
+            <input type="range" id="base" name="base"
+                   min="2" max="36" step="1" value="2">
+            <output for="base" id="base_out">2</output>
         </div>
+        <div class="linha">
+            <label for="precisao">Precisão <em>p</em></label>
+            <input type="range" id="precisao" name="precisao"
+                   min="1" max="10" step="1" value="4">
+            <output for="precisao" id="precisao_out">4</output>
+        </div>
+        <div class="linha">
+            <label for="expoente_minimo">Expoente mínimo <em>e<sub>min</sub></em></label>
+            <input type="range" id="expoente_minimo" name="expoente_minimo"
+                   min="-30" max="0" step="1" value="-3">
+            <output for="expoente_minimo" id="expoente_minimo_out">-3</output>
+        </div>
+        <noscript>
+            <form action="/calculate" method="post" style="margin-top:1rem">
+                <input type="number" name="base" min="2" max="36" value="2">
+                <input type="number" name="precisao" min="1" max="10" value="4">
+                <input type="number" name="expoente_minimo"
+                       min="-30" max="0" value="-3">
+                <button type="submit">Gerar (sem JS)</button>
+            </form>
+        </noscript>
+    </div>
 
+    <div id="status" class="carregando"></div>
+    <div id="erro" class="erro" hidden></div>
+    <div id="conteudo" hidden>
+        <div class="meta" id="meta"></div>
         <h2>Gráfico — somente normais</h2>
-        <img src="{{ resultado.img_normais }}" alt="Gráfico dos normais">
-
-        {% if resultado.img_completo %}
+        <img id="img_normais" alt="Gráfico dos normais">
+        <div id="bloco_completo">
             <h2>Gráfico — completo (normais + subnormais)</h2>
-            <img src="{{ resultado.img_completo }}" alt="Gráfico completo">
-        {% endif %}
-
+            <img id="img_completo" alt="Gráfico completo">
+        </div>
         <h2>Tabelas</h2>
-        <pre>{{ resultado.tabela }}</pre>
-    {% endif %}
+        <pre id="tabela"></pre>
+    </div>
+
+<script>
+(() => {
+    const sliders = {
+        base:             document.getElementById("base"),
+        precisao:         document.getElementById("precisao"),
+        expoente_minimo:  document.getElementById("expoente_minimo"),
+    };
+    const outs = {
+        base:             document.getElementById("base_out"),
+        precisao:         document.getElementById("precisao_out"),
+        expoente_minimo:  document.getElementById("expoente_minimo_out"),
+    };
+    const status    = document.getElementById("status");
+    const erro      = document.getElementById("erro");
+    const conteudo  = document.getElementById("conteudo");
+    const meta      = document.getElementById("meta");
+    const tabela    = document.getElementById("tabela");
+    const imgN      = document.getElementById("img_normais");
+    const imgC      = document.getElementById("img_completo");
+    const blocoC    = document.getElementById("bloco_completo");
+
+    let timer = null;
+    let controller = null;
+    let ultimaChave = "";
+
+    function atualizarOuts() {
+        for (const k in sliders) outs[k].textContent = sliders[k].value;
+    }
+
+    async function consultar() {
+        const params = new URLSearchParams({
+            base:            sliders.base.value,
+            precisao:        sliders.precisao.value,
+            expoente_minimo: sliders.expoente_minimo.value,
+        });
+        const chave = params.toString();
+        if (chave === ultimaChave) return;
+        ultimaChave = chave;
+
+        if (controller) controller.abort();
+        controller = new AbortController();
+
+        status.textContent = "Calculando…";
+        erro.hidden = true;
+
+        try {
+            const r = await fetch("/api/calculate?" + chave, {
+                signal: controller.signal,
+            });
+            const dados = await r.json();
+
+            if (!r.ok) {
+                conteudo.hidden = true;
+                erro.textContent = dados.erro || "Erro desconhecido.";
+                erro.hidden = false;
+                status.textContent = "";
+                return;
+            }
+
+            erro.hidden = true;
+            conteudo.hidden = false;
+            status.textContent = "";
+
+            meta.innerHTML =
+                `<div><strong>F(${dados.base}, ${dados.precisao}, ` +
+                `${dados.emin}, ${dados.emax})</strong></div>` +
+                `<div>Normais positivos: <span>${dados.qtd_normais}</span></div>` +
+                `<div>Subnormais positivos: <span>${dados.qtd_subnormais}</span></div>` +
+                (!dados.completos && dados.qtd_subnormais > 0
+                    ? `<div class="aviso">Subnormais excedem o limite; ` +
+                      `exibindo apenas os normais.</div>`
+                    : "");
+
+            imgN.src = dados.img_normais + "?t=" + Date.now();
+            if (dados.img_completo) {
+                imgC.src = dados.img_completo + "?t=" + Date.now();
+                blocoC.hidden = false;
+            } else {
+                blocoC.hidden = true;
+            }
+            tabela.textContent = dados.tabela;
+        } catch (e) {
+            if (e.name === "AbortError") return;
+            status.textContent = "";
+            erro.textContent = "Falha de rede: " + e.message;
+            erro.hidden = false;
+        }
+    }
+
+    function agendar() {
+        atualizarOuts();
+        clearTimeout(timer);
+        timer = setTimeout(consultar, 250);
+    }
+
+    for (const k in sliders) {
+        sliders[k].addEventListener("input", agendar);
+    }
+
+    atualizarOuts();
+    consultar();
+})();
+</script>
 </body>
 </html>
